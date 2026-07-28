@@ -1,5 +1,16 @@
 // ==========================================
-// 1. STATE & LOCAL STORAGE (OFFLINE FIRST)
+// 1. SISTEM KEAMANAN (ANTI INSPECT & COPY)
+// ==========================================
+document.addEventListener('contextmenu', event => event.preventDefault());
+
+document.onkeydown = function(e) {
+  if(e.keyCode == 123) return false; // F12
+  if(e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) return false; // Ctrl+Shift+I/J/C
+  if(e.ctrlKey && e.keyCode === 85) return false; // Ctrl+U
+};
+
+// ==========================================
+// 2. STATE & LOCAL STORAGE (OFFLINE FIRST)
 // ==========================================
 const STORE_TICKETS = 'mancup_tickets_v3';
 const STORE_LOGS = 'mancup_activations_v3';
@@ -16,7 +27,7 @@ const saveState = () => {
 };
 
 // ==========================================
-// 2. UTILITIES & TOAST UI
+// 3. UTILITIES & TOAST UI
 // ==========================================
 const $ = id => document.getElementById(id);
 $('year').textContent = new Date().getFullYear();
@@ -37,16 +48,71 @@ const wibKey = (d = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: 
 const wibFormat = (date) => new Date(date).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
 const isSameWIBDay = (a, b) => wibKey(a) === wibKey(b);
 
+
 // ==========================================
-// 3. LOADING SCREEN 10 DETIK & NAVIGASI
+// 4. KONTROL LOGIKA COUNTDOWN & BOOTING
 // ==========================================
+const targetDate = new Date("2026-08-01T13:00:00+07:00").getTime();
+
 document.addEventListener('DOMContentLoaded', () => {
+  const now = new Date().getTime();
+  
+  // Jika waktu rilis sudah tiba/lewat
+  if (now >= targetDate) {
+    $('countdown-screen').classList.add('hidden');
+    startMainApp(); 
+  } else {
+    // Jika belum, tampilkan layar hitung mundur
+    $('countdown-screen').classList.remove('hidden');
+    $('countdown-screen').classList.add('flex');
+    $('main-app').classList.add('hidden');
+    
+    updateCountdownUi(); // Panggilan pertama
+    const timerInterval = setInterval(() => {
+      const distance = targetDate - new Date().getTime();
+      
+      if (distance <= 0) {
+        clearInterval(timerInterval);
+        const cdScreen = $('countdown-screen');
+        cdScreen.style.opacity = '0'; // Efek memudar
+        
+        setTimeout(() => {
+          cdScreen.classList.add("hidden");
+          cdScreen.classList.remove("flex");
+          startMainApp(); // Jalankan aplikasi setelah animasi selesai
+        }, 700);
+      } else {
+        updateCountdownUi(distance);
+      }
+    }, 1000);
+  }
+});
+
+function updateCountdownUi(distance) {
+  if(!distance) distance = targetDate - new Date().getTime();
+  const d = Math.floor(distance / (1000 * 60 * 60 * 24));
+  const h = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const m = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+  const s = Math.floor((distance % (1000 * 60)) / 1000);
+
+  $('days').innerText = d.toString().padStart(2, '0');
+  $('hours').innerText = h.toString().padStart(2, '0');
+  $('minutes').innerText = m.toString().padStart(2, '0');
+  $('seconds').innerText = s.toString().padStart(2, '0');
+}
+
+// Fungsi ini HANYA akan dipanggil jika hitung mundur selesai
+function startMainApp() {
+  $('main-app').classList.remove('hidden');
+  $('main-app').classList.add('flex');
+  document.body.classList.remove('overflow-hidden');
+
   const loadingScreen = $('loading-screen');
   const statusText = $('loading-status');
   const thankYouText = $('loading-thanks');
   const bodyContainer = $('body-container');
 
-  // Timeline animasi
+  // Animasi Loading 10 Detik
   setTimeout(() => { statusText.innerText = "Memeriksa Database Perangkat..."; }, 3000);
   setTimeout(() => { statusText.innerText = "Sistem Siap"; }, 6000);
   setTimeout(() => { 
@@ -54,16 +120,15 @@ document.addEventListener('DOMContentLoaded', () => {
       thankYouText.classList.remove('opacity-0'); 
   }, 8000);
 
-  // Tutup layar tepat di 10 detik
   setTimeout(() => {
       loadingScreen.classList.add('opacity-0');
       bodyContainer.classList.remove('overflow-hidden');
       setTimeout(() => { 
           loadingScreen.style.display = 'none'; 
-          initSystem();
+          initSystem(); // Render data dashboard dan form
       }, 1000);
-  }, 10000); 
-});
+  }, 10000);
+}
 
 function initSystem() {
   switchSection('sec-activation', 'nav-activation');
@@ -72,7 +137,10 @@ function initSystem() {
   showToast('Sistem MANCUP berjalan optimal', 'success');
 }
 
-// Logika Navigasi
+
+// ==========================================
+// 5. NAVIGASI HALAMAN
+// ==========================================
 const sections = ['sec-activation', 'sec-create', 'sec-dashboard'];
 const navIds = ['nav-activation', 'nav-create', 'nav-dashboard'];
 
@@ -92,7 +160,7 @@ function switchSection(secId, navId) {
 }
 
 // ==========================================
-// 4. PEMBUATAN TIKET (MANUAL & CSV)
+// 6. PEMBUATAN TIKET (MANUAL & CSV)
 // ==========================================
 function getNextId() {
   let i = counter;
@@ -124,7 +192,6 @@ $('form-create').addEventListener('submit', (e) => {
   showToast(`Berhasil generate ID: ${id}`, 'success');
 });
 
-// Import Massal (CSV)
 $('btn-dl-template').addEventListener('click', () => {
   const header = 'Nama Pembeli,Jenis Tiket,Max Hari,Tim Favorit,Catatan\n';
   const sample = 'Siswa Dummy,Siswa MAN Kapuas,7,-,-\nTamu VIP,VIP,14,-,Gate A';
@@ -145,7 +212,6 @@ $('btn-process-csv').addEventListener('click', () => {
       let errors = 0;
 
       for (let i = 1; i < lines.length; i++) {
-        // Regex untuk membaca CSV dengan aman (menghormati tanda kutip)
         const fields = lines[i].split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map(f => f.replace(/^"(.*)"$/,'$1').trim());
         const [name, type, maxD, team = '', note = ''] = fields;
 
@@ -189,7 +255,7 @@ function renderImportSummary(created, errors) {
 }
 
 // ==========================================
-// 5. VALIDASI & PENCARIAN TIKET
+// 7. VALIDASI & PENCARIAN TIKET
 // ==========================================
 $('btn-search').addEventListener('click', () => processSearch());
 $('search-id').addEventListener('keypress', (e) => { if(e.key === 'Enter') processSearch(); });
@@ -221,7 +287,6 @@ function renderTicketDetail(id) {
   else statusBadge = '<span class="bg-slate-200 text-slate-700 px-3 py-1 rounded-full text-xs font-bold">BARU</span>';
 
   const lastAct = t.history.length > 0 ? wibFormat(t.history[t.history.length-1].date) : '-';
-  const disableBtnAction = isDead ? `toggleStatus('${id}')` : (isExhausted || todayUsed ? `activateManual('${id}')` : `activateManual('${id}')`); // simplify logic below
 
   box.innerHTML = `
     <div class="p-6 border border-slate-200 rounded-xl bg-slate-50 transition-all">
@@ -316,7 +381,7 @@ function refreshActivationStats() {
 }
 
 // ==========================================
-// 6. DASHBOARD, CHART, & TABLE
+// 8. DASHBOARD, CHART, & TABLE
 // ==========================================
 function refreshAllData() {
   const list = Object.values(tickets);
@@ -402,7 +467,7 @@ $('db-filter').addEventListener('change', renderTable);
 $('btn-refresh').addEventListener('click', refreshAllData);
 
 // ==========================================
-// 7. EXPORT & PEMELIHARAAN (DANGER ZONE)
+// 9. EXPORT & PEMELIHARAAN
 // ==========================================
 function downloadCSV(content, filename) {
   const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
@@ -438,7 +503,6 @@ $('btn-export-db').addEventListener('click', () => {
   showToast('Export database berhasil', 'success');
 });
 
-// Fungsi untuk menggantikan confirm() bawaan browser
 function showConfirm(title, msg, onConfirm) {
   const modal = $('custom-modal');
   $('modal-title').textContent = title;
@@ -446,10 +510,8 @@ function showConfirm(title, msg, onConfirm) {
   
   modal.classList.remove('hidden');
   
-  // Event Batal
   $('modal-cancel').onclick = () => modal.classList.add('hidden');
   
-  // Event Konfirmasi
   $('modal-confirm').onclick = () => {
     modal.classList.add('hidden');
     onConfirm();
