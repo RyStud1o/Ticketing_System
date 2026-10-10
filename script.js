@@ -29,8 +29,7 @@ const saveState = () => {
 // ==========================================
 // 3. UTILITIES & TOAST UI
 // ==========================================
-const $ = id => document.getElementById(id);
-$('year').textContent = new Date().getFullYear();
+const $= id => document.getElementById(id);$('year').textContent = new Date().getFullYear();
 
 const showToast = (msg, type = 'info') => {
   const toast = $('toast');
@@ -44,7 +43,9 @@ const showToast = (msg, type = 'info') => {
   setTimeout(() => { toast.classList.add('translate-y-24', 'opacity-0'); }, 3000);
 };
 
-const wibKey = (d = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+// --- FIX: OPTIMASI PEMROSESAN WAKTU (MENCEGAH CPU LAG) ---
+const wibFormatterKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' });
+const wibKey = (d = new Date()) => wibFormatterKey.format(d);
 const wibFormat = (date) => new Date(date).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
 const isSameWIBDay = (a, b) => wibKey(a) === wibKey(b);
 
@@ -64,8 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     // Jika belum, tampilkan layar hitung mundur
     $('countdown-screen').classList.remove('hidden');
-    $('countdown-screen').classList.add('flex');
-    $('main-app').classList.add('hidden');
+    $('countdown-screen').classList.add('flex');$('main-app').classList.add('hidden');
     
     updateCountdownUi(); // Panggilan pertama
     const timerInterval = setInterval(() => {
@@ -95,16 +95,13 @@ function updateCountdownUi(distance) {
   const m = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
   const s = Math.floor((distance % (1000 * 60)) / 1000);
 
-  $('days').innerText = d.toString().padStart(2, '0');
-  $('hours').innerText = h.toString().padStart(2, '0');
-  $('minutes').innerText = m.toString().padStart(2, '0');
-  $('seconds').innerText = s.toString().padStart(2, '0');
+  $('days').innerText = d.toString().padStart(2, '0');$('hours').innerText = h.toString().padStart(2, '0');
+  $('minutes').innerText = m.toString().padStart(2, '0');$('seconds').innerText = s.toString().padStart(2, '0');
 }
 
 // Fungsi ini HANYA akan dipanggil jika hitung mundur selesai
 function startMainApp() {
-  $('main-app').classList.remove('hidden');
-  $('main-app').classList.add('flex');
+  $('main-app').classList.remove('hidden');$('main-app').classList.add('flex');
   document.body.classList.remove('overflow-hidden');
 
   const loadingScreen = $('loading-screen');
@@ -152,8 +149,7 @@ function switchSection(secId, navId) {
   sections.forEach(s => $(s).classList.add('hidden'));
   navIds.forEach(n => $(n).classList.remove('active'));
   
-  $(secId).classList.remove('hidden');
-  $(navId).classList.add('active');
+  $(secId).classList.remove('hidden');$(navId).classList.add('active');
 
   if (secId === 'sec-activation') refreshActivationStats();
   if (secId === 'sec-dashboard') refreshAllData();
@@ -247,7 +243,7 @@ function renderImportSummary(created, errors) {
       <div class="bg-rose-100 text-rose-700 px-3 py-1 rounded text-sm font-bold">Gagal/Dilewati: ${errors}</div>
     </div>
     <div class="max-h-32 overflow-y-auto text-xs space-y-1 text-slate-600 custom-scrollbar pr-2">
-      ${created.slice(0, 30).map(t => `<div class="border-b border-slate-200 pb-1">${t.id} - ${t.name}</div>`).join('')}
+      ${created.slice(0, 30).map(t => `<div class="border-b border-slate-200 pb-1">${t.id} -${t.name}</div>`).join('')}
       ${created.length > 30 ? `<div>...dan ${created.length - 30} lainnya.</div>` : ''}
     </div>
   `;
@@ -257,8 +253,7 @@ function renderImportSummary(created, errors) {
 // ==========================================
 // 7. VALIDASI & PENCARIAN TIKET
 // ==========================================
-$('btn-search').addEventListener('click', () => processSearch());
-$('search-id').addEventListener('keypress', (e) => { if(e.key === 'Enter') processSearch(); });
+$('btn-search').addEventListener('click', () => processSearch());$('search-id').addEventListener('keypress', (e) => { if(e.key === 'Enter') processSearch(); });
 
 function processSearch() {
   const id = $('search-id').value.trim().toUpperCase();
@@ -441,7 +436,11 @@ function renderTable() {
     return;
   }
 
-  tbody.innerHTML = filtered.map(t => {
+  // --- FIX: BATASI RENDER MAKSIMAL 100 BARIS (MENCEGAH BROWSER FREEZE/LAG) ---
+  const MAX_RENDER = 100;
+  const dataToRender = filtered.slice(0, MAX_RENDER);
+
+  let htmlResult = dataToRender.map(t => {
     let status = 'BARU', sColor = 'bg-slate-100 text-slate-600';
     if(t.deactivated) { status = 'NONAKTIF'; sColor = 'bg-rose-100 text-rose-700'; }
     else if(t.usedDays >= t.maxDays) { status = 'HABIS'; sColor = 'bg-amber-100 text-amber-700'; }
@@ -460,11 +459,23 @@ function renderTable() {
       </tr>
     `;
   }).join('');
+
+  // Tampilkan pesan panduan jika data aslinya lebih dari 100
+  if (filtered.length > MAX_RENDER) {
+    htmlResult += `
+      <tr>
+        <td colspan="6" class="p-4 text-center text-xs font-bold text-slate-500 bg-slate-100/50">
+          Menampilkan ${MAX_RENDER} dari total ${filtered.length} data. <br/>Gunakan kotak pencarian di atas untuk mencari tiket lainnya.
+        </td>
+      </tr>
+    `;
+  }
+
+  tbody.innerHTML = htmlResult;
 }
 
 $('db-search').addEventListener('input', renderTable);
-$('db-filter').addEventListener('change', renderTable);
-$('btn-refresh').addEventListener('click', refreshAllData);
+$('db-filter').addEventListener('change', renderTable);$('btn-refresh').addEventListener('click', refreshAllData);
 
 // ==========================================
 // 9. EXPORT & PEMELIHARAAN
@@ -504,15 +515,12 @@ $('btn-export-db').addEventListener('click', () => {
 });
 
 function showConfirm(title, msg, onConfirm) {
-  const modal = $('custom-modal');
-  $('modal-title').textContent = title;
+  const modal = $('custom-modal');$('modal-title').textContent = title;
   $('modal-msg').textContent = msg;
   
   modal.classList.remove('hidden');
   
-  $('modal-cancel').onclick = () => modal.classList.add('hidden');
-  
-  $('modal-confirm').onclick = () => {
+  $('modal-cancel').onclick = () => modal.classList.add('hidden');$('modal-confirm').onclick = () => {
     modal.classList.add('hidden');
     onConfirm();
   };
