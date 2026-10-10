@@ -52,7 +52,7 @@ const isSameWIBDay = (a, b) => wibKey(a) === wibKey(b);
 // ==========================================
 // 4. KONTROL LOGIKA COUNTDOWN & BOOTING
 // ==========================================
-const targetDate = new Date("2026-08-01T13:00:00+07:00").getTime();
+const targetDate = new Date("2026-10-10T20:45:00+07:00").getTime();
 
 document.addEventListener('DOMContentLoaded', () => {
   const now = new Date().getTime();
